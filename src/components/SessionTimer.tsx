@@ -77,6 +77,7 @@ export default function SessionTimer({ onStartNewSession }: SessionTimerProps) {
       setRemainingSeconds(left);
       if (left <= 0) {
         const breakEndsAt = Date.now() + BREAK_SECONDS * 1000;
+        sessionStorage.removeItem(STORAGE_SESSION_ENDS);
         sessionStorage.setItem(STORAGE_BREAK_ENDS, String(breakEndsAt));
         setPhase("break");
         setRemainingSeconds(BREAK_SECONDS);
@@ -84,7 +85,7 @@ export default function SessionTimer({ onStartNewSession }: SessionTimerProps) {
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [phase === "ready" ? "ready" : "running"]);
+  }, [phase]);
 
   const startNewSession = () => {
     onStartNewSession?.();
@@ -98,20 +99,20 @@ export default function SessionTimer({ onStartNewSession }: SessionTimerProps) {
   if (phase === "ready") {
     return (
       <div
-        className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-amber-950/95 px-6"
+        className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-duo-gray/90 px-6"
         role="alert"
         aria-live="polite"
       >
-        <div className="rounded-2xl bg-amber-100 p-8 text-center shadow-2xl max-w-md">
+        <div className="rounded-3xl border-2 border-duo-gray/10 bg-white p-8 text-center shadow-2xl max-w-md">
           <span className="text-5xl" aria-hidden>🤸‍♀️</span>
-          <h2 className="mt-4 text-2xl font-bold text-amber-900">Break over!</h2>
-          <p className="mt-2 text-amber-800">
-            Ready for another 30-minute session? Tap below to start.
+          <h2 className="mt-4 text-2xl font-extrabold text-duo-gray">Break over!</h2>
+          <p className="mt-2 text-duo-gray-light">
+            Ready for another 30-minute session?
           </p>
           <button
             type="button"
             onClick={startNewSession}
-            className="mt-6 rounded-xl bg-amber-500 px-6 py-3 font-bold text-amber-900 shadow-lg hover:bg-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-700"
+            className="mt-6 rounded-2xl bg-duo-green px-8 py-4 font-bold text-white shadow-lg hover:bg-duo-green-hover focus:outline-none focus:ring-4 focus:ring-duo-green/30"
           >
             Start new session
           </button>
@@ -125,17 +126,17 @@ export default function SessionTimer({ onStartNewSession }: SessionTimerProps) {
     const s = (remainingSeconds ?? 0) % 60;
     return (
       <div
-        className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-amber-950/95 px-6"
+        className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-duo-gray/90 px-6"
         role="alert"
         aria-live="polite"
       >
-        <div className="rounded-2xl bg-amber-100 p-8 text-center shadow-2xl max-w-md">
+        <div className="rounded-3xl border-2 border-duo-gray/10 bg-white p-8 text-center shadow-2xl max-w-md">
           <span className="text-5xl" aria-hidden>☕</span>
-          <h2 className="mt-4 text-2xl font-bold text-amber-900">Session over!</h2>
-          <p className="mt-2 text-amber-800">
-            Take a 5-minute break. You can start a new session when the timer ends.
+          <h2 className="mt-4 text-2xl font-extrabold text-duo-gray">Session over!</h2>
+          <p className="mt-2 text-duo-gray-light">
+            Take a 5-minute break. Start again when the timer ends.
           </p>
-          <p className="mt-4 text-3xl font-mono font-bold text-amber-900">
+          <p className="mt-4 text-4xl font-mono font-bold text-duo-green">
             {m}:{String(s).padStart(2, "0")}
           </p>
         </div>
@@ -149,22 +150,22 @@ export default function SessionTimer({ onStartNewSession }: SessionTimerProps) {
       : 0;
 
   return (
-    <div className="w-full px-4">
+    <div className="w-full">
       <div
-        className="h-4 w-full overflow-hidden rounded-full bg-amber-200 shadow-inner"
+        className="h-3 w-full overflow-hidden rounded-full bg-duo-gray/10"
         role="progressbar"
         aria-valuenow={Math.round(progress)}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-label="Session time remaining (balance beam)"
+        aria-label="Session progress"
       >
         <div
-          className="h-full rounded-full bg-gradient-to-r from-amber-500 to-rose-500 transition-all duration-1000 ease-linear"
+          className="h-full rounded-full bg-duo-green transition-all duration-1000 ease-linear"
           style={{ width: `${progress}%` }}
         />
       </div>
-      <p className="mt-1 text-center text-sm font-medium text-amber-900">
-        Balance Beam · {remainingSeconds !== null ? `${Math.floor(remainingSeconds / 60)}:${String(remainingSeconds % 60).padStart(2, "0")} left` : "—"}
+      <p className="mt-1 text-center text-xs font-bold text-duo-gray-light">
+        {remainingSeconds !== null ? `${Math.floor(remainingSeconds / 60)}:${String(remainingSeconds % 60).padStart(2, "0")} left` : "—"}
       </p>
     </div>
   );

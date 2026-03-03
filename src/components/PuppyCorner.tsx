@@ -31,14 +31,14 @@ export default function PuppyCorner({ totalPoints }: PuppyCornerProps) {
 
   return (
     <section
-      className="rounded-2xl border-2 border-amber-700/50 bg-gradient-to-b from-amber-50 to-rose-50/70 p-5 shadow-lg"
+      className="rounded-3xl border-2 border-duo-gray/10 bg-white p-5 shadow-lg"
       aria-label="Ashi's pups"
     >
-      <h3 className="text-center text-sm font-bold uppercase tracking-wide text-amber-800">
-        🐕 Ashi&apos;s puppy store
+      <h3 className="text-center text-base font-extrabold text-duo-gray">
+        🐕 Puppy store
       </h3>
-      <p className="mt-1 text-center text-xs text-amber-700">
-        Pups you&apos;ve ever adopted stay here — earn points to keep them with you
+      <p className="mt-1 text-center text-xs text-duo-gray-light">
+        Adopt pups with XP — they stay in your store
       </p>
 
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -50,68 +50,67 @@ export default function PuppyCorner({ totalPoints }: PuppyCornerProps) {
           return (
             <div
               key={i}
-              className={`rounded-xl border-2 p-3 text-center transition-all ${
+              className={`rounded-2xl border-2 p-3 text-center transition-all ${
                 owned
-                  ? "border-amber-500 bg-amber-100/90 shadow-md"
+                  ? "border-duo-green bg-duo-green/10 shadow-md"
                   : everAcquired
-                    ? "border-amber-300 bg-amber-50/80 opacity-90"
-                    : "border-amber-200 bg-white/60 opacity-70"
+                    ? "border-duo-gray/20 bg-duo-gray-bg"
+                    : "border-duo-gray/10 bg-duo-gray-bg opacity-70"
               }`}
             >
               <div
-                className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full text-3xl ${
-                  owned ? "bg-amber-200" : everAcquired ? "bg-amber-100" : "bg-amber-100"
+                className={`mx-auto flex h-14 w-14 items-center justify-center rounded-2xl text-3xl ${
+                  owned ? "bg-duo-green/20" : everAcquired ? "bg-white" : "bg-duo-gray/10"
                 }`}
               >
                 {everAcquired ? PUPPY_EMOJIS[i] : "🐾"}
               </div>
               <p
-                className={`mt-1.5 font-semibold ${
-                  owned ? "text-amber-900" : everAcquired ? "text-amber-700" : "text-amber-600"
+                className={`mt-1.5 font-bold ${
+                  owned ? "text-duo-green" : "text-duo-gray"
                 }`}
               >
                 {name}
               </p>
-              <p className="text-xs text-amber-600">
-                {owned ? "✓ with you" : everAcquired ? `earn ${threshold} to keep` : `${threshold} pts`}
+              <p className="text-xs text-duo-gray-light">
+                {owned ? "✓ with you" : everAcquired ? `${threshold} XP to keep` : `${threshold} XP`}
               </p>
             </div>
           );
         })}
       </div>
 
-      {/* Progress to next puppy */}
       {hasNextPuppy && (
         <div className="mt-4">
-          <p className="mb-1 text-center text-xs font-medium text-amber-800">
-            Next pup ({PUPPY_NAMES[count]}) at {nextThreshold} pts
+          <p className="mb-1 text-center text-xs font-bold text-duo-gray">
+            Next: {PUPPY_NAMES[count]} at {nextThreshold} XP
           </p>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-amber-200">
+          <div className="h-3 w-full overflow-hidden rounded-full bg-duo-gray/10">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-amber-400 to-rose-400 transition-all duration-500"
-              style={{ width: `${Math.min(100, progressToNext * 100)}%` }}
+              className="h-full rounded-full bg-duo-green transition-all duration-500"
+              style={{
+                width: `${Math.max(0, Math.min(100, progressToNext * 100))}%`,
+              }}
               role="progressbar"
-              aria-valuenow={Math.round(progressToNext * 100)}
+              aria-valuenow={Math.round(
+                Math.max(0, Math.min(100, progressToNext * 100))
+              )}
               aria-valuemin={0}
               aria-valuemax={100}
               aria-label={`Progress to ${PUPPY_NAMES[count]}`}
             />
           </div>
-          <p className="mt-1 text-center text-xs text-amber-700">
-            {totalPoints} / {nextThreshold} pts
+          <p className="mt-1 text-center text-xs text-duo-gray-light">
+            {totalPoints} / {nextThreshold} XP
           </p>
         </div>
       )}
 
       {!hasNextPuppy && (
-        <p className="mt-3 text-center text-sm font-medium text-amber-800">
-          🎉 All six pups are yours! Keep points up so they stay.
+        <p className="mt-3 text-center text-sm font-bold text-duo-green">
+          🎉 All six pups earned!
         </p>
       )}
-
-      <p className="mt-3 text-center text-sm font-bold text-amber-900">
-        {totalPoints} pts
-      </p>
     </section>
   );
 }

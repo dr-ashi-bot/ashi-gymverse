@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
 import SessionTimer from "@/components/SessionTimer";
 import QuestionCard from "@/components/QuestionCard";
 import type { QuestionData } from "@/components/QuestionCard";
 import ConfettiTrigger from "@/components/ConfettiTrigger";
 import PuppyCorner from "@/components/PuppyCorner";
+import DuoHeader from "@/components/DuoHeader";
 import {
   TOPICS,
   DEFAULT_TOPIC_ID,
@@ -14,7 +14,19 @@ import {
   getPointsForDifficulty,
 } from "@/lib/constants";
 import { getStoredPoints, setStoredPoints } from "@/lib/points-storage";
-import { saveSessionToHistory, addConceptToRevise } from "@/lib/session-storage";
+import {
+  saveSessionToHistory,
+  addConceptToRevise,
+} from "@/lib/session-storage";
+import {
+  getHearts,
+  loseHeart,
+  refillHearts,
+  getStreak,
+  recordPracticeDay,
+  getDailyGoal,
+  incrementDailyGoal,
+} from "@/lib/duo-storage";
 import ReviewNotesModal from "@/components/ReviewNotesModal";
 
 const DEFAULT_USER_ID = "demo-user";
@@ -32,6 +44,23 @@ export default function Home() {
   const [revealed, setRevealed] = useState(false);
   const [points, setPoints] = useState(0);
   const [reviewNotesOpen, setReviewNotesOpen] = useState(false);
+  const [hearts, setHeartsState] = useState(() => getHearts());
+  const [streak, setStreakState] = useState(() => getStreak());
+  const [dailyGoal, setDailyGoalState] = useState(() => getDailyGoal());
+  const timeoutIdsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  useEffect(() => {
+    return () => {
+      timeoutIdsRef.current.forEach(clearTimeout);
+      timeoutIdsRef.current = [];
+    };
+  }, []);
+
+  const refreshDuoState = useCallback(() => {
+    setHeartsState(getHearts());
+    setStreakState(getStreak());
+    setDailyGoalState(getDailyGoal());
+  }, []);
 
   const fetchPoints = useCallback(async () => {
     try {
@@ -78,7 +107,8 @@ export default function Home() {
     const stored = getStoredPoints();
     setPoints(stored);
     fetchPoints();
-  }, [fetchPoints]);
+    refreshDuoState();
+  }, [fetchPoints, refreshDuoState]);
 
   useEffect(() => {
     fetchQuestion();
@@ -86,7 +116,7 @@ export default function Home() {
 
   const handleSelectOption = useCallback(
     async (option: string) => {
-      if (!question || isChecking || revealed) return;
+      if (!question || isChecking || revealed || hearts <= 0) return;
       setSelectedOption(option);
       setIsChecking(true);
       setHint(null);
@@ -116,6 +146,8 @@ export default function Home() {
         }
         if (data.correct) {
           setIsCorrect(true);
+          recordPracticeDay();
+          incrementDailyGoal();
           const next =
             typeof data.total_points === "number"
               ? data.total_points
@@ -124,17 +156,24 @@ export default function Home() {
                 : points;
           setPoints(next);
           setStoredPoints(next);
-          setTimeout(() => fetchQuestion(), 1200);
-          setTimeout(() => fetchPoints(), 500);
+          refreshDuoState();
+          const t1 = setTimeout(() => fetchQuestion(), 1200);
+          const t2 = setTimeout(() => fetchPoints(), 500);
+          timeoutIdsRef.current.push(t1, t2);
         } else {
+          loseHeart();
+          refreshDuoState();
           setHint(data.hint ?? "Not quite! Try again.");
           setIsCorrect(false);
           setWrongAttemptCount((c) => c + 1);
-          const topicLabel = TOPICS.find((t) => t.id === topicId)?.label ?? topicId;
+          const topicLabel =
+            TOPICS.find((t) => t.id === topicId)?.label ?? topicId;
           addConceptToRevise({
             topicId,
             topicLabel,
-            questionPreview: question.question.slice(0, 80) + (question.question.length > 80 ? "…" : ""),
+            questionPreview:
+              question.question.slice(0, 80) +
+              (question.question.length > 80 ? "…" : ""),
             hint: data.hint ?? "Review this concept.",
           });
           const next =
@@ -153,7 +192,18 @@ export default function Home() {
         setIsChecking(false);
       }
     },
-    [question, topicId, wrongAttemptCount, isChecking, revealed, points, fetchQuestion, fetchPoints]
+    [
+      question,
+      topicId,
+      wrongAttemptCount,
+      isChecking,
+      revealed,
+      points,
+      hearts,
+      fetchQuestion,
+      fetchPoints,
+      refreshDuoState,
+    ]
   );
 
   const handleReveal = useCallback(async () => {
@@ -191,10 +241,11 @@ export default function Home() {
             : points;
       setPoints(next);
       setStoredPoints(next);
-      setTimeout(() => {
+      const t = setTimeout(() => {
         fetchQuestion();
         fetchPoints();
       }, 3000);
+      timeoutIdsRef.current.push(t);
     } catch (e) {
       setError("Could not reveal answer. Try again.");
     } finally {
@@ -202,40 +253,39 @@ export default function Home() {
     }
   }, [question, topicId, points, isChecking, revealed, fetchQuestion, fetchPoints]);
 
+  const handleStartNewSession = useCallback(() => {
+    refillHearts();
+    refreshDuoState();
+    saveSessionToHistory(points);
+  }, [points, refreshDuoState]);
+
   const pointsForQuestion = question
     ? getPointsForDifficulty(question.difficulty ?? "medium")
     : 0;
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-amber-100 via-amber-50/95 to-rose-100/90">
-      <header className="border-b-2 border-amber-600/30 bg-gradient-to-r from-amber-100 to-rose-100/80 py-5 shadow-md">
-        <div className="mx-auto max-w-4xl px-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h1 className="text-2xl font-extrabold tracking-tight text-amber-900 drop-shadow-sm">
-              Ashi Gymverse 🤸‍♀️
-            </h1>
-            <Link
-              href="/dashboard"
-              className="rounded-xl bg-white/90 px-4 py-2 text-sm font-semibold text-amber-800 shadow-sm ring-1 ring-amber-300 hover:bg-amber-50"
-            >
-              My progress
-            </Link>
-          </div>
-          <div className="mt-4">
-            <SessionTimer onStartNewSession={() => saveSessionToHistory(points)} />
-          </div>
-        </div>
-      </header>
+    <main className="min-h-screen bg-duo-gray-bg">
+      <DuoHeader
+        hearts={hearts}
+        streak={streak}
+        xp={points}
+        dailyGoalDone={dailyGoal.done}
+        dailyGoalTarget={dailyGoal.target}
+      />
 
-      <div className="mx-auto max-w-4xl px-4 py-6">
+      <div className="border-b border-duo-gray/10 bg-white px-4 py-3">
+        <SessionTimer onStartNewSession={handleStartNewSession} />
+      </div>
+
+      <div className="mx-auto max-w-2xl px-4 py-6">
         <section className="mb-4">
-          <label className="mb-2 block text-sm font-semibold text-amber-900">
-            Topic
+          <label className="mb-1.5 block text-sm font-bold text-duo-gray">
+            Choose a skill
           </label>
           <select
             value={topicId}
             onChange={(e) => setTopicId(e.target.value as TopicId)}
-            className="w-full rounded-xl border-2 border-amber-300 bg-white px-4 py-2 text-amber-900 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-400"
+            className="w-full rounded-2xl border-2 border-duo-gray/20 bg-white px-4 py-3 text-duo-gray focus:border-duo-green focus:outline-none focus:ring-2 focus:ring-duo-green/30"
             aria-label="Select topic"
           >
             {TOPICS.map((t) => (
@@ -251,28 +301,42 @@ export default function Home() {
         </section>
 
         <section
-          className="rounded-3xl border-2 border-amber-600/40 bg-white/70 p-6 shadow-xl shadow-amber-200/30"
-          aria-label="Gym floor"
+          className="overflow-hidden rounded-3xl border-2 border-duo-gray/10 bg-white p-6 shadow-lg"
+          aria-label="Question"
         >
+          {hearts <= 0 && (
+            <div className="mb-4 rounded-2xl bg-duo-red/10 p-4 text-center">
+              <p className="font-bold text-duo-red">Out of hearts!</p>
+              <p className="mt-1 text-sm text-duo-gray">
+                Take a break or start a new session to refill.
+              </p>
+            </div>
+          )}
           {loading && !question && (
             <div className="flex min-h-[280px] items-center justify-center">
-              <p className="text-lg text-amber-800">Loading your question…</p>
+              <p className="text-duo-gray">Loading…</p>
             </div>
           )}
           {error && !question && (
-            <div className="rounded-xl bg-rose-100 p-4 text-center text-rose-800">
+            <div
+              className="rounded-2xl bg-duo-red/10 p-4 text-center text-duo-red"
+              role="alert"
+            >
               <p>{error}</p>
               <button
                 type="button"
                 onClick={fetchQuestion}
-                className="mt-2 rounded-lg bg-rose-200 px-4 py-2 font-medium hover:bg-rose-300"
+                className="mt-2 rounded-2xl bg-duo-red px-4 py-2 font-bold text-white hover:bg-duo-red-hover"
               >
                 Try again
               </button>
             </div>
           )}
           {error && question && (
-            <div className="mb-4 rounded-xl bg-rose-100 p-3 text-center text-sm text-rose-800">
+            <div
+              className="mb-4 rounded-2xl bg-duo-red/10 p-3 text-center text-sm text-duo-red"
+              role="alert"
+            >
               {error}
             </div>
           )}
@@ -286,6 +350,7 @@ export default function Home() {
               pointsForQuestion={pointsForQuestion}
               currentPoints={points}
               revealed={revealed}
+              heartsLeft={hearts}
               onSelectOption={handleSelectOption}
               onReveal={handleReveal}
               onOpenReviewNotes={() => setReviewNotesOpen(true)}
