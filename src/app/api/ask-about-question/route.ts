@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+function getOpenAI(): OpenAI {
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) throw new Error("OPENAI_API_KEY is not set");
+  return new OpenAI({ apiKey: key });
+}
 
 export async function POST(request: NextRequest) {
   let body: { question?: string; user_question?: string; options?: string[] };
@@ -31,7 +35,8 @@ export async function POST(request: NextRequest) {
 Do NOT give away the correct answer or which option is right. You can explain concepts, definitions, or steps without revealing the answer.`;
 
   try {
-    const completion = await openai.chat.completions.create({
+    const openai = getOpenAI();
+  const completion = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
         { role: "system", content: systemPrompt },

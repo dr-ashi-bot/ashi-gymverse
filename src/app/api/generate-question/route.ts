@@ -3,7 +3,11 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
 import { TOPICS, ALLOWED_QUESTION_NAMES } from "@/lib/constants";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+function getOpenAI(): OpenAI {
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) throw new Error("OPENAI_API_KEY is not set");
+  return new OpenAI({ apiKey: key });
+}
 
 type Difficulty = "easy" | "medium" | "hard";
 
@@ -110,6 +114,7 @@ Output: Return valid JSON only, no markdown. Shape:
   "explanation": "short explanation of why the answer is correct"
 }`;
 
+    const openai = getOpenAI();
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [

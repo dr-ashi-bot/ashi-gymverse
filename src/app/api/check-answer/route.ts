@@ -3,7 +3,11 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
 import { getPointsForDifficulty } from "@/lib/constants";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+function getOpenAI(): OpenAI {
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) throw new Error("OPENAI_API_KEY is not set");
+  return new OpenAI({ apiKey: key });
+}
 
 interface CheckAnswerBody {
   user_id: string;
@@ -145,6 +149,7 @@ async function generateSocraticHint(
 Give a Socratic hint that guides the student without giving away the answer. Do NOT say the correct answer or option letter.
 Keep it to 1-2 sentences, encouraging, and point to the concept they might have missed.`;
 
+  const openai = getOpenAI();
   const completion = await openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
