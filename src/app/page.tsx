@@ -7,12 +7,16 @@ import type { QuestionData } from "@/components/QuestionCard";
 import ConfettiTrigger from "@/components/ConfettiTrigger";
 import PuppyCorner from "@/components/PuppyCorner";
 import DuoHeader from "@/components/DuoHeader";
-import {
-  TOPICS,
-  DEFAULT_TOPIC_ID,
-  type TopicId,
-  getPointsForDifficulty,
-} from "@/lib/constants";
+import { TOPICS, getPointsForDifficulty } from "@/lib/constants";
+
+type Difficulty = "easy" | "medium" | "hard";
+
+function getHarder(d: Difficulty): Difficulty {
+  return d === "easy" ? "medium" : d === "medium" ? "hard" : "hard";
+}
+function getEasier(d: Difficulty): Difficulty {
+  return d === "hard" ? "medium" : d === "medium" ? "easy" : "easy";
+}
 import { getStoredPoints, setStoredPoints } from "@/lib/points-storage";
 import {
   saveSessionToHistory,
@@ -32,7 +36,8 @@ import ReviewNotesModal from "@/components/ReviewNotesModal";
 const DEFAULT_USER_ID = "demo-user";
 
 export default function Home() {
-  const [topicId, setTopicId] = useState<TopicId>(DEFAULT_TOPIC_ID);
+  const [adaptiveDifficulty, setAdaptiveDifficulty] =
+    useState<Difficulty>("medium");
   const [question, setQuestion] = useState<QuestionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,30 +83,36 @@ export default function Home() {
     }
   }, []);
 
-  const fetchQuestion = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    setSelectedOption(null);
-    setHint(null);
-    setIsCorrect(null);
-    setWrongAttemptCount(0);
-    setRevealed(false);
-    try {
-      const res = await fetch(
-        `/api/generate-question?user_id=${encodeURIComponent(DEFAULT_USER_ID)}&current_topic=${encodeURIComponent(topicId)}`
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `Request failed: ${res.status}`);
+  const fetchQuestion = useCallback(
+    async (hintDifficulty?: Difficulty) => {
+      const hint = hintDifficulty ?? adaptiveDifficulty;
+      setLoading(true);
+      setError(null);
+      setSelectedOption(null);
+      setHint(null);
+      setIsCorrect(null);
+      setWrongAttemptCount(0);
+      setRevealed(false);
+      try {
+        const params = new URLSearchParams({
+          user_id: DEFAULT_USER_ID,
+          hint_difficulty: hint,
+        });
+        const res = await fetch(`/api/generate-question?${params.toString()}`);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `Request failed: ${res.status}`);
+        }
+        const data = (await res.json()) as QuestionData;
+        setQuestion(data);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not load question");
+      } finally {
+        setLoading(false);
       }
-      const data = (await res.json()) as QuestionData;
-      setQuestion(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load question");
-    } finally {
-      setLoading(false);
-    }
-  }, [topicId]);
+    },
+    [adaptiveDifficulty]
+  );
 
   useEffect(() => {
     const stored = getStoredPoints();
@@ -111,8 +122,8 @@ export default function Home() {
   }, [fetchPoints, refreshDuoState]);
 
   useEffect(() => {
-    fetchQuestion();
-  }, [fetchQuestion]);
+    fetchQuestion("medium");
+  }, []);
 
   const handleSelectOption = useCallback(
     async (option: string) => {
@@ -122,12 +133,13 @@ export default function Home() {
       setHint(null);
       setError(null);
       try {
+        const topicForCheck = question.topic_id ?? "math_4_operations";
         const res = await fetch("/api/check-answer", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             user_id: DEFAULT_USER_ID,
-            current_topic: topicId,
+            current_topic: topicForCheck,
             user_answer: option,
             correct_answer: question.correct_answer,
             question: question.question,
@@ -157,7 +169,9 @@ export default function Home() {
           setPoints(next);
           setStoredPoints(next);
           refreshDuoState();
-          const t1 = setTimeout(() => fetchQuestion(), 1200);
+          const nextDiff = getHarder(adaptiveDifficulty);
+          setAdaptiveDifficulty(nextDiff);
+          const t1 = setTimeout(() => fetchQuestion(nextDiff), 1200);
           const t2 = setTimeout(() => fetchPoints(), 500);
           timeoutIdsRef.current.push(t1, t2);
         } else {
@@ -166,10 +180,11 @@ export default function Home() {
           setHint(data.hint ?? "Not quite! Try again.");
           setIsCorrect(false);
           setWrongAttemptCount((c) => c + 1);
+          const topicForRevise = question.topic_id ?? "math_4_operations";
           const topicLabel =
-            TOPICS.find((t) => t.id === topicId)?.label ?? topicId;
+            TOPICS.find((t) => t.id === topicForRevise)?.label ?? topicForRevise;
           addConceptToRevise({
-            topicId,
+            topicId: topicForRevise,
             topicLabel,
             questionPreview:
               question.question.slice(0, 80) +
@@ -184,6 +199,8 @@ export default function Home() {
                 : points;
           setPoints(next);
           setStoredPoints(next);
+          const easierDiff = getEasier(adaptiveDifficulty);
+          setAdaptiveDifficulty(easierDiff);
         }
       } catch (e) {
         setError("Could not check answer. Try again.");
@@ -194,7 +211,7 @@ export default function Home() {
     },
     [
       question,
-      topicId,
+      adaptiveDifficulty,
       wrongAttemptCount,
       isChecking,
       revealed,
@@ -213,12 +230,13 @@ export default function Home() {
     setIsChecking(true);
     setError(null);
     try {
+      const topicForCheck = question.topic_id ?? "math_4_operations";
       const res = await fetch("/api/check-answer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_id: DEFAULT_USER_ID,
-          current_topic: topicId,
+          current_topic: topicForCheck,
           correct_answer: question.correct_answer,
           question: question.question,
           explanation: question.explanation,
@@ -242,7 +260,7 @@ export default function Home() {
       setPoints(next);
       setStoredPoints(next);
       const t = setTimeout(() => {
-        fetchQuestion();
+        fetchQuestion(adaptiveDifficulty);
         fetchPoints();
       }, 3000);
       timeoutIdsRef.current.push(t);
@@ -251,7 +269,7 @@ export default function Home() {
     } finally {
       setIsChecking(false);
     }
-  }, [question, topicId, points, isChecking, revealed, fetchQuestion, fetchPoints]);
+  }, [question, adaptiveDifficulty, points, isChecking, revealed, fetchQuestion, fetchPoints]);
 
   const handleStartNewSession = useCallback(() => {
     refillHearts();
@@ -274,28 +292,15 @@ export default function Home() {
       />
 
       <div className="border-b border-duo-gray/10 bg-white px-4 py-3">
-        <SessionTimer onStartNewSession={handleStartNewSession} />
+        <div className="mx-auto max-w-2xl">
+          <h2 className="mb-2 text-lg font-extrabold text-duo-gray">
+            Practice
+          </h2>
+          <SessionTimer onStartNewSession={handleStartNewSession} />
+        </div>
       </div>
 
       <div className="mx-auto max-w-2xl px-4 py-6">
-        <section className="mb-4">
-          <label className="mb-1.5 block text-sm font-bold text-duo-gray">
-            Choose a skill
-          </label>
-          <select
-            value={topicId}
-            onChange={(e) => setTopicId(e.target.value as TopicId)}
-            className="w-full rounded-2xl border-2 border-duo-gray/20 bg-white px-4 py-3 text-duo-gray focus:border-duo-green focus:outline-none focus:ring-2 focus:ring-duo-green/30"
-            aria-label="Select topic"
-          >
-            {TOPICS.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-        </section>
-
         <section className="mb-6">
           <PuppyCorner totalPoints={points} />
         </section>
@@ -325,7 +330,7 @@ export default function Home() {
               <p>{error}</p>
               <button
                 type="button"
-                onClick={fetchQuestion}
+                onClick={() => fetchQuestion(adaptiveDifficulty)}
                 className="mt-2 rounded-2xl bg-duo-red px-4 py-2 font-bold text-white hover:bg-duo-red-hover"
               >
                 Try again

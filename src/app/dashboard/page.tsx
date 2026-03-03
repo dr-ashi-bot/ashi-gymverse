@@ -127,6 +127,15 @@ export default function DashboardPage() {
             </ul>
           )}
         </section>
+
+        <footer className="mt-12 pb-8 text-center">
+          <Link
+            href="/admin"
+            className="text-xs font-bold text-duo-gray-light underline hover:text-duo-gray hover:no-underline"
+          >
+            Admin
+          </Link>
+        </footer>
       </div>
     </main>
   );

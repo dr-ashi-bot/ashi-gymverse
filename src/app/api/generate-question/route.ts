@@ -7,6 +7,11 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 type Difficulty = "easy" | "medium" | "hard";
 
+function pickRandomTopicId(): string {
+  const idx = Math.floor(Math.random() * TOPICS.length);
+  return TOPICS[idx].id;
+}
+
 interface GeneratedQuestion {
   question: string;
   options: string[];
@@ -24,20 +29,25 @@ function getTopicLabel(topicId: string): string {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const user_id = searchParams.get("user_id");
-  const current_topic = searchParams.get("current_topic");
+  const current_topic = searchParams.get("current_topic") ?? pickRandomTopicId();
+  const hint_difficulty = searchParams.get("hint_difficulty") as Difficulty | null;
 
-  if (!user_id || !current_topic) {
+  if (!user_id) {
     return NextResponse.json(
-      { error: "Missing user_id or current_topic" },
+      { error: "Missing user_id" },
       { status: 400 }
     );
   }
 
-  return handleGenerate(user_id, current_topic);
+  return handleGenerate(user_id, current_topic, hint_difficulty ?? undefined);
 }
 
 export async function POST(request: NextRequest) {
-  let body: { user_id?: string; current_topic?: string };
+  let body: {
+    user_id?: string;
+    current_topic?: string;
+    hint_difficulty?: Difficulty;
+  };
   try {
     body = await request.json();
   } catch {
@@ -47,26 +57,30 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { user_id, current_topic } = body;
-  if (!user_id || !current_topic) {
+  const { user_id, current_topic: rawTopic, hint_difficulty } = body;
+  if (!user_id) {
     return NextResponse.json(
-      { error: "Missing user_id or current_topic" },
+      { error: "Missing user_id" },
       { status: 400 }
     );
   }
-
-  return handleGenerate(user_id, current_topic);
+  const current_topic = rawTopic ?? pickRandomTopicId();
+  return handleGenerate(user_id, current_topic, hint_difficulty);
 }
 
 async function handleGenerate(
   user_id: string,
-  current_topic: string
+  current_topic: string,
+  hint_difficulty?: Difficulty
 ): Promise<NextResponse> {
   try {
     const masteryScore = await getMasteryScore(user_id, current_topic);
 
-    const difficulty: Difficulty =
+    let difficulty: Difficulty =
       masteryScore < 0.4 ? "easy" : masteryScore > 0.8 ? "hard" : "medium";
+    if (hint_difficulty) {
+      difficulty = hint_difficulty;
+    }
 
     const topicLabel = getTopicLabel(current_topic);
 
@@ -148,6 +162,7 @@ Output: Return valid JSON only, no markdown. Shape:
       hint: parsed.hint,
       explanation: parsed.explanation,
       difficulty,
+      topic_id: current_topic,
     });
   } catch (err) {
     console.error("[generate-question]", err);

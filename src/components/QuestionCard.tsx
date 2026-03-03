@@ -10,6 +10,7 @@ export interface QuestionData {
   hint: string;
   explanation: string;
   difficulty?: string;
+  topic_id?: string;
 }
 
 interface QuestionCardProps {
